@@ -977,11 +977,6 @@ export default {
 		this.$bus.$on("clearHomePage", () => {
 			this.clearHomePage();
 		});
-		this.$bus.$on("showReadBookmarks", () => {
-			this.showRead = true;
-			this.page = 1;
-			this.loadData();
-		});
 		// Prepare history state watcher
 		var stateWatcher = (e) => {
 			var state = e.state || {},
