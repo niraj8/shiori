@@ -1,7 +1,7 @@
 var template = `
-<div class="bookmark" :class="{list: ListMode, 'no-thumbnail': HideThumbnail, selected: selected}">
-	<a class="bookmark-selector" 
-		v-if="editMode" 
+<div class="bookmark" :class="{list: ListMode, 'no-thumbnail': HideThumbnail, selected: selected, 'is-read': isRead}">
+	<a class="bookmark-selector"
+		v-if="editMode"
 		@click="selectBookmark">
 	</a>
 	<a class="bookmark-link" :href="mainURL" target="_blank" rel="noopener noreferrer">
@@ -35,6 +35,9 @@ var template = `
             <a v-if="hasEbook" title="Download book" @click="downloadebook">
                 <i class="fas fa-fw fa-book"></i>
             </a>
+			<a :title="isRead ? 'Mark as unread' : 'Mark as read'" @click="toggleRead">
+				<i :class="isRead ? 'fas fa-fw fa-check-circle' : 'fas fa-fw fa-check'"></i>
+			</a>
 		</template>
 	</div>
 </div>`;
@@ -51,6 +54,7 @@ export default {
 		hasContent: Boolean,
 		hasArchive: Boolean,
 		hasEbook: Boolean,
+		isRead: Boolean,
 		modifiedAt: String,
 		index: Number,
 		ShowId: Boolean,
@@ -121,6 +125,9 @@ export default {
 		},
 		updateBookmark() {
 			this.$emit("update", this.eventItem);
+		},
+		toggleRead() {
+			this.$emit("toggle-read", this.eventItem);
 		},
 		downloadebook() {
 			const id = this.id;

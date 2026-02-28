@@ -16,6 +16,7 @@ type Bookmark struct {
 	CreatedAt  string `db:"created_at"`
 	ModifiedAt string `db:"modified_at"`
 	HasContent bool   `db:"has_content"`
+	IsRead     bool   `db:"is_read"`
 }
 
 // BookmarkDTO is the bookmark object representation in database and the data transfer object
@@ -33,6 +34,7 @@ type BookmarkDTO struct {
 	HTML          string   `db:"html"          json:"html,omitempty"`
 	ImageURL      string   `db:"image_url"     json:"imageURL"`
 	HasContent    bool     `db:"has_content"   json:"hasContent"`
+	IsRead        bool     `db:"is_read"       json:"isRead"`
 	Tags          []TagDTO `json:"tags"`
 	HasArchive    bool     `json:"hasArchive"`
 	HasEbook      bool     `json:"hasEbook"`
@@ -52,6 +54,7 @@ func (dto *BookmarkDTO) ToBookmark() Bookmark {
 		CreatedAt:  dto.CreatedAt,
 		ModifiedAt: dto.ModifiedAt,
 		HasContent: dto.HasContent,
+		IsRead:     dto.IsRead,
 	}
 }
 
@@ -67,6 +70,7 @@ func (b *Bookmark) ToDTO() BookmarkDTO {
 		CreatedAt:  b.CreatedAt,
 		ModifiedAt: b.ModifiedAt,
 		HasContent: b.HasContent,
+		IsRead:     b.IsRead,
 		Tags:       []TagDTO{},
 	}
 }

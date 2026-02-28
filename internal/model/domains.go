@@ -21,6 +21,7 @@ type BookmarksDomain interface {
 	AddTagToBookmark(ctx context.Context, bookmarkID int, tagID int) error
 	RemoveTagFromBookmark(ctx context.Context, bookmarkID int, tagID int) error
 	BookmarkExists(ctx context.Context, id int) (bool, error)
+	SetReadStatus(ctx context.Context, id int, isRead bool) error
 }
 
 type AuthDomain interface {

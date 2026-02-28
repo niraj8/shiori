@@ -352,6 +352,54 @@ func HandleRemoveTagFromBookmark(deps model.Dependencies, c model.WebContext) {
 	response.SendJSON(c, http.StatusOK, nil)
 }
 
+type setReadStatusPayload struct {
+	IsRead bool `json:"is_read"`
+}
+
+// HandleSetBookmarkReadStatus sets the read status of a bookmark
+//
+//	@Summary					Set read status of a bookmark.
+//	@Tags						Auth
+//	@securityDefinitions.apikey	ApiKeyAuth
+//	@Param						id		path	int						true	"Bookmark ID"
+//	@Param						payload	body	setReadStatusPayload	true	"Set Read Status Payload"
+//	@Produce					json
+//	@Success					200	{object}	nil
+//	@Failure					400	{object}	nil	"Invalid request"
+//	@Failure					403	{object}	nil	"Token not provided/invalid"
+//	@Failure					404	{object}	nil	"Bookmark not found"
+//	@Router						/api/v1/bookmarks/{id}/read [put]
+func HandleSetBookmarkReadStatus(deps model.Dependencies, c model.WebContext) {
+	if err := middleware.RequireLoggedInUser(deps, c); err != nil {
+		response.SendError(c, http.StatusForbidden, err.Error())
+		return
+	}
+
+	bookmarkID, err := strconv.Atoi(c.Request().PathValue("id"))
+	if err != nil {
+		response.SendError(c, http.StatusBadRequest, "Invalid bookmark ID")
+		return
+	}
+
+	var payload setReadStatusPayload
+	if err := json.NewDecoder(c.Request().Body).Decode(&payload); err != nil {
+		response.SendError(c, http.StatusBadRequest, "Invalid request payload")
+		return
+	}
+
+	err = deps.Domains().Bookmarks().SetReadStatus(c.Request().Context(), bookmarkID, payload.IsRead)
+	if err != nil {
+		if errors.Is(err, model.ErrBookmarkNotFound) {
+			response.SendError(c, http.StatusNotFound, "Bookmark not found")
+			return
+		}
+		response.SendError(c, http.StatusInternalServerError, "Failed to update read status")
+		return
+	}
+
+	response.SendJSON(c, http.StatusOK, nil)
+}
+
 // HandleBulkUpdateBookmarkTags updates the tags for multiple bookmarks
 //
 //	@Summary					Bulk update tags for multiple bookmarks.

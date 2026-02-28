@@ -166,6 +166,21 @@ func (d *BookmarksDomain) BookmarkExists(ctx context.Context, id int) (bool, err
 	return d.deps.Database().BookmarkExists(ctx, id)
 }
 
+// SetReadStatus marks a bookmark as read or unread
+func (d *BookmarksDomain) SetReadStatus(ctx context.Context, id int, isRead bool) error {
+	bookmark, exists, err := d.deps.Database().GetBookmark(ctx, id, "")
+	if err != nil {
+		return fmt.Errorf("failed to get bookmark: %w", err)
+	}
+	if !exists {
+		return model.ErrBookmarkNotFound
+	}
+
+	b := bookmark.ToBookmark()
+	b.IsRead = isRead
+	return d.deps.Database().SaveBookmark(ctx, b)
+}
+
 func NewBookmarksDomain(deps model.Dependencies) *BookmarksDomain {
 	return &BookmarksDomain{
 		deps: deps,

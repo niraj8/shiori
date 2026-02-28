@@ -11,6 +11,9 @@ var template = `
         <a v-if="tags.length > 0" title="Show tags" @click="showDialogTags">
             <i class="fas fa-fw fa-tags"></i>
         </a>
+        <a :title="showRead ? 'Hide read bookmarks' : 'Show read bookmarks'" @click="toggleShowRead">
+            <i :class="showRead ? 'fas fa-fw fa-eye-slash' : 'fas fa-fw fa-eye'"></i>
+        </a>
         <a v-if="activeAccount.owner" title="Batch edit" @click="toggleEditMode">
             <i class="fas fa-fw fa-pencil-alt"></i>
         </a>
@@ -52,6 +55,7 @@ var template = `
             :hasContent="book.hasContent"
             :hasArchive="book.hasArchive"
             :hasEbook="book.hasEbook"
+            :isRead="book.isRead"
             :tags="book.tags"
             :index="index"
             :key="book.id"
@@ -67,7 +71,8 @@ var template = `
             @edit="showDialogEdit"
             @delete="showDialogDelete"
             @generate-ebook="ebookGenerate"
-            @update="showDialogUpdateCache">
+            @update="showDialogUpdateCache"
+            @toggle-read="toggleReadStatus">
         </bookmark-item>
         <pagination-box v-if="maxPage > 1"
             :page="page"
@@ -109,6 +114,7 @@ export default {
 			loading: false,
 			editMode: false,
 			selection: [],
+			showRead: false,
 
 			search: "",
 			page: 0,
@@ -211,13 +217,19 @@ export default {
 			keyword = keyword.trim().replace(/\s+/g, " ");
 
 			// Prepare URL for API
-			var url = new URL("api/bookmarks", document.baseURI);
-			url.search = new URLSearchParams({
+			var urlParams = {
 				keyword: keyword,
 				tags: tags.join(","),
 				exclude: excludedTags.join(","),
 				page: this.page,
-			});
+			};
+
+			if (!this.showRead) {
+				urlParams.isRead = "false";
+			}
+
+			var url = new URL("api/bookmarks", document.baseURI);
+			url.search = new URLSearchParams(urlParams);
 
 			// Fetch data from API
 			var skipFetchTags = Error("skip fetching tags");
@@ -349,6 +361,39 @@ export default {
 
 			this.page = 1;
 			this.loadData();
+		},
+		toggleShowRead() {
+			this.showRead = !this.showRead;
+			this.page = 1;
+			this.loadData();
+		},
+		async toggleReadStatus(item) {
+			var id = typeof item.id === "number" ? item.id : 0,
+				index = typeof item.index === "number" ? item.index : -1;
+
+			if (id < 1 || index < 0) return;
+
+			var book = this.bookmarks[index];
+			var newIsRead = !book.isRead;
+
+			try {
+				await apiRequest(
+					new URL(`api/v1/bookmarks/${id}/read`, document.baseURI),
+					{
+						method: "put",
+						body: JSON.stringify({ is_read: newIsRead }),
+					},
+				);
+
+				this.$set(this.bookmarks[index], "isRead", newIsRead);
+
+				// If not showing read items and just marked as read, remove from list
+				if (!this.showRead && newIsRead) {
+					this.bookmarks.splice(index, 1);
+				}
+			} catch (err) {
+				this.showErrorDialog(err.message);
+			}
 		},
 		showDialogAdd(values) {
 			if (values === undefined) {
@@ -931,6 +976,11 @@ export default {
 	mounted() {
 		this.$bus.$on("clearHomePage", () => {
 			this.clearHomePage();
+		});
+		this.$bus.$on("showReadBookmarks", () => {
+			this.showRead = true;
+			this.page = 1;
+			this.loadData();
 		});
 		// Prepare history state watcher
 		var stateWatcher = (e) => {

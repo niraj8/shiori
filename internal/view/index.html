@@ -29,6 +29,9 @@
     			<a v-for="item in sidebarItems" :title="item.title" :class="{active: activePage === item.page}" @click="switchPage(item.page)">
     				<i class="fas fa-fw" :class="item.icon"></i>
     			</a>
+    			<a title="Read bookmarks" :class="{active: showingRead}" @click="showReadBookmarks">
+    				<i class="fas fa-fw fa-check-double"></i>
+    			</a>
     			<div class="spacer"></div>
     			<a title="Logout" @click="logout">
     				<i class="fas fa-fw fa-sign-out-alt"></i>
@@ -63,6 +66,7 @@
 				isLoggedIn: null,
 				loginRequired: false,
 				activePage: "page-home",
+				showingRead: false,
 				sidebarItems: [{
 					title: "Home",
 					icon: "fa-home",
@@ -74,7 +78,13 @@
 				}],
 			},
 			methods: {
+				showReadBookmarks() {
+					this.showingRead = true;
+					this.activePage = "page-home";
+					Vue.prototype.$bus.$emit("showReadBookmarks");
+				},
 				switchPage(page) {
+					this.showingRead = false;
 					var pageName = page.replace("page-", ""),
 						state = { activePage: page },
 						url = new Url;

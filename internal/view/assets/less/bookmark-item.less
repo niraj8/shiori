@@ -18,6 +18,14 @@
 		background-color: var(--selectedBg);
 	}
 
+	&.is-read {
+		opacity: 0.6;
+
+		.bookmark-link .title {
+			color: var(--fadedText, #888);
+		}
+	}
+
 	.bookmark-selector {
 		position: absolute;
 		top: 0;

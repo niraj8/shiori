@@ -125,6 +125,7 @@ type DBGetBookmarksOptions struct {
 	OrderMethod  DBOrderMethod
 	Limit        int
 	Offset       int
+	IsRead       *bool
 }
 
 // DBListAccountsOptions is options for fetching accounts from database.

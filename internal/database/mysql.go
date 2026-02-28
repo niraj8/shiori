@@ -68,6 +68,7 @@ var mysqlMigrations = []migration{
 	newFileMigration("0.8.2", "0.8.3", "mysql/0008_set_modified_at_equal_created_at"),
 	newFileMigration("0.8.3", "0.8.4", "mysql/0009_index_for_created_at"),
 	newFileMigration("0.8.4", "0.8.5", "mysql/0010_index_for_modified_at"),
+	newFileMigration("0.8.5", "0.8.6", "mysql/0011_add_is_read"),
 }
 
 // MySQLDatabase is implementation of Database interface
@@ -138,8 +139,8 @@ func (db *MySQLDatabase) SaveBookmarks(ctx context.Context, create bool, bookmar
 	if err := db.withTx(ctx, func(tx *sqlx.Tx) error {
 		// Prepare statement
 		stmtInsertBook, err := tx.Preparex(`INSERT INTO bookmark
-			(url, title, excerpt, author, public, content, html, modified_at, created_at)
-			VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+			(url, title, excerpt, author, public, content, html, modified_at, created_at, is_read)
+			VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
 		if err != nil {
 			return errors.WithStack(err)
 		}
@@ -152,7 +153,8 @@ func (db *MySQLDatabase) SaveBookmarks(ctx context.Context, create bool, bookmar
 			public   = ?,
 			content  = ?,
 			html     = ?,
-			modified_at = ?
+			modified_at = ?,
+			is_read  = ?
 		WHERE id = ?`)
 		if err != nil {
 			return errors.WithStack(err)
@@ -207,7 +209,7 @@ func (db *MySQLDatabase) SaveBookmarks(ctx context.Context, create bool, bookmar
 				var res sql.Result
 				res, err = stmtInsertBook.ExecContext(ctx,
 					book.URL, book.Title, book.Excerpt, book.Author,
-					book.Public, book.Content, book.HTML, book.ModifiedAt, book.CreatedAt)
+					book.Public, book.Content, book.HTML, book.ModifiedAt, book.CreatedAt, book.IsRead)
 				if err != nil {
 					return errors.WithStack(err)
 				}
@@ -219,7 +221,7 @@ func (db *MySQLDatabase) SaveBookmarks(ctx context.Context, create bool, bookmar
 			} else {
 				_, err = stmtUpdateBook.ExecContext(ctx,
 					book.URL, book.Title, book.Excerpt, book.Author,
-					book.Public, book.Content, book.HTML, book.ModifiedAt, book.ID)
+					book.Public, book.Content, book.HTML, book.ModifiedAt, book.IsRead, book.ID)
 			}
 			if err != nil {
 				return errors.WithStack(err)
@@ -298,7 +300,8 @@ func (db *MySQLDatabase) GetBookmarks(ctx context.Context, opts model.DBGetBookm
 		`public`,
 		`created_at`,
 		`modified_at`,
-		`content <> "" as has_content`}
+		`content <> "" as has_content`,
+		`is_read`}
 
 	if opts.WithContent {
 		columns = append(columns, `content`, `html`)
@@ -370,6 +373,12 @@ func (db *MySQLDatabase) GetBookmarks(ctx context.Context, opts model.DBGetBookm
 			WHERE t.name IN(?))`
 
 		args = append(args, opts.ExcludedTags)
+	}
+
+	// Add where clause for read status
+	if opts.IsRead != nil {
+		query += ` AND is_read = ?`
+		args = append(args, *opts.IsRead)
 	}
 
 	// Add order clause
@@ -504,6 +513,12 @@ func (db *MySQLDatabase) GetBookmarksCount(ctx context.Context, opts model.DBGet
 		args = append(args, opts.ExcludedTags)
 	}
 
+	// Add where clause for read status
+	if opts.IsRead != nil {
+		query += ` AND is_read = ?`
+		args = append(args, *opts.IsRead)
+	}
+
 	// Expand query, because some of the args might be an array
 	query, args, err := sqlx.In(query, args...)
 	if err != nil {
@@ -573,7 +588,7 @@ func (db *MySQLDatabase) GetBookmark(ctx context.Context, id int, url string) (m
 	sb := sqlbuilder.NewSelectBuilder()
 	sb.Select(
 		"id", "url", "title", "excerpt", "author", `public`, "modified_at",
-		"content", "html", "created_at", "has_content")
+		"content", "html", "created_at", "has_content", "is_read")
 	sb.From("bookmark")
 
 	// Add conditions
@@ -990,6 +1005,7 @@ func (db *MySQLDatabase) SaveBookmark(ctx context.Context, bookmark model.Bookma
 		sb.Assign("public", bookmark.Public),
 		sb.Assign("modified_at", bookmark.ModifiedAt),
 		sb.Assign("has_content", bookmark.HasContent),
+		sb.Assign("is_read", bookmark.IsRead),
 	)
 	sb.Where(sb.Equal("id", bookmark.ID))
 

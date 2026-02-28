@@ -56,6 +56,7 @@ func (h *Handler) ApiGetBookmarks(w http.ResponseWriter, r *http.Request, ps htt
 	strPage := r.URL.Query().Get("page")
 	strTags := r.URL.Query().Get("tags")
 	strExcludedTags := r.URL.Query().Get("exclude")
+	strIsRead := r.URL.Query().Get("isRead")
 
 	tags := strings.Split(strTags, ",")
 	if len(tags) == 1 && tags[0] == "" {
@@ -80,6 +81,11 @@ func (h *Handler) ApiGetBookmarks(w http.ResponseWriter, r *http.Request, ps htt
 		Limit:        30,
 		Offset:       (page - 1) * 30,
 		OrderMethod:  model.ByLastAdded,
+	}
+
+	if strIsRead != "" {
+		isRead := strIsRead == "true"
+		searchOptions.IsRead = &isRead
 	}
 
 	// Calculate max page

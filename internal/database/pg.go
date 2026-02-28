@@ -70,6 +70,7 @@ var postgresMigrations = []migration{
 		return nil
 	}),
 	newFileMigration("0.3.0", "0.4.0", "postgres/0002_created_time"),
+	newFileMigration("0.4.0", "0.5.0", "postgres/0003_add_is_read"),
 }
 
 // PGDatabase is implementation of Database interface
@@ -141,8 +142,8 @@ func (db *PGDatabase) SaveBookmarks(ctx context.Context, create bool, bookmarks 
 	if err := db.withTx(ctx, func(tx *sqlx.Tx) error {
 		// Prepare statement
 		stmtInsertBook, err := tx.Preparex(`INSERT INTO bookmark
-			(url, title, excerpt, author, public, content, html, modified_at, created_at)
-			VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9)
+			(url, title, excerpt, author, public, content, html, modified_at, created_at, is_read)
+			VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 		RETURNING id`)
 		if err != nil {
 			return errors.WithStack(err)
@@ -156,8 +157,9 @@ func (db *PGDatabase) SaveBookmarks(ctx context.Context, create bool, bookmarks 
 			public   = $5,
 			content  = $6,
 			html     = $7,
-			modified_at = $8
-			WHERE id = $9`)
+			modified_at = $8,
+			is_read  = $9
+			WHERE id = $10`)
 		if err != nil {
 			return errors.WithStack(err)
 		}
@@ -210,11 +212,11 @@ func (db *PGDatabase) SaveBookmarks(ctx context.Context, create bool, bookmarks 
 				book.CreatedAt = modifiedTime
 				err = stmtInsertBook.QueryRowContext(ctx,
 					book.URL, book.Title, book.Excerpt, book.Author,
-					book.Public, book.Content, book.HTML, book.ModifiedAt, book.CreatedAt).Scan(&book.ID)
+					book.Public, book.Content, book.HTML, book.ModifiedAt, book.CreatedAt, book.IsRead).Scan(&book.ID)
 			} else {
 				_, err = stmtUpdateBook.ExecContext(ctx,
 					book.URL, book.Title, book.Excerpt, book.Author,
-					book.Public, book.Content, book.HTML, book.ModifiedAt, book.ID)
+					book.Public, book.Content, book.HTML, book.ModifiedAt, book.IsRead, book.ID)
 			}
 			if err != nil {
 				return errors.WithStack(err)
@@ -288,7 +290,8 @@ func (db *PGDatabase) GetBookmarks(ctx context.Context, opts model.DBGetBookmark
 		`public`,
 		`created_at`,
 		`modified_at`,
-		`content <> '' has_content`}
+		`content <> '' has_content`,
+		`is_read`}
 
 	if opts.WithContent {
 		columns = append(columns, `content`, `html`)
@@ -363,6 +366,12 @@ func (db *PGDatabase) GetBookmarks(ctx context.Context, opts model.DBGetBookmark
 			WHERE t.name IN(:extags))`
 
 		arg["extags"] = opts.ExcludedTags
+	}
+
+	// Add where clause for read status
+	if opts.IsRead != nil {
+		query += ` AND is_read = :is_read`
+		arg["is_read"] = *opts.IsRead
 	}
 
 	// Add order clause
@@ -500,6 +509,12 @@ func (db *PGDatabase) GetBookmarksCount(ctx context.Context, opts model.DBGetBoo
 		arg["etags"] = opts.ExcludedTags
 	}
 
+	// Add where clause for read status
+	if opts.IsRead != nil {
+		query += ` AND is_read = :is_read`
+		arg["is_read"] = *opts.IsRead
+	}
+
 	// Expand query, because some of the args might be an array
 	var err error
 	query, args, err := sqlx.Named(query, arg)
@@ -582,7 +597,7 @@ func (db *PGDatabase) GetBookmark(ctx context.Context, id int, url string) (mode
 	sb := sqlbuilder.PostgreSQL.NewSelectBuilder()
 	sb.Select(
 		"id", "url", "title", "excerpt", "author", `"public"`, "modified_at",
-		"content", "html", "created_at", "has_content")
+		"content", "html", "created_at", "has_content", "is_read")
 	sb.From("bookmark")
 
 	// Add conditions
@@ -1014,6 +1029,7 @@ func (db *PGDatabase) SaveBookmark(ctx context.Context, bookmark model.Bookmark)
 		sb.Assign("public", bookmark.Public),
 		sb.Assign("modified_at", bookmark.ModifiedAt),
 		sb.Assign("has_content", bookmark.HasContent),
+		sb.Assign("is_read", bookmark.IsRead),
 	)
 	sb.Where(sb.Equal("id", bookmark.ID))
 

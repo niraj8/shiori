@@ -64,6 +64,7 @@ var sqliteMigrations = []migration{
 	newFileMigration("0.3.0", "0.4.0", "sqlite/0002_denormalize_content"),
 	newFileMigration("0.4.0", "0.5.0", "sqlite/0003_uniq_id"),
 	newFileMigration("0.5.0", "0.6.0", "sqlite/0004_created_time"),
+	newFileMigration("0.6.0", "0.7.0", "sqlite/0005_add_is_read"),
 }
 
 // SQLiteDatabase is implementation of Database interface
@@ -220,15 +221,15 @@ func (db *SQLiteDatabase) SaveBookmarks(ctx context.Context, create bool, bookma
 		// Prepare statement
 
 		stmtInsertBook, err := tx.PreparexContext(ctx, `INSERT INTO bookmark
-			(url, title, excerpt, author, public, modified_at, has_content, created_at)
-			VALUES(?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`)
+			(url, title, excerpt, author, public, modified_at, has_content, created_at, is_read)
+			VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`)
 		if err != nil {
 			return fmt.Errorf("failed to prepare insert book statement: %w", err)
 		}
 
 		stmtUpdateBook, err := tx.PreparexContext(ctx, `UPDATE bookmark SET
 			url = ?, title = ?,	excerpt = ?, author = ?,
-			public = ?, modified_at = ?, has_content = ?
+			public = ?, modified_at = ?, has_content = ?, is_read = ?
 			WHERE id = ?`)
 		if err != nil {
 			return fmt.Errorf("failed to prepare update book statement: %w", err)
@@ -297,10 +298,10 @@ func (db *SQLiteDatabase) SaveBookmarks(ctx context.Context, create bool, bookma
 			if create {
 				book.CreatedAt = modifiedTime
 				err = stmtInsertBook.QueryRowContext(ctx,
-					book.URL, book.Title, book.Excerpt, book.Author, book.Public, book.ModifiedAt, hasContent, book.CreatedAt).Scan(&book.ID)
+					book.URL, book.Title, book.Excerpt, book.Author, book.Public, book.ModifiedAt, hasContent, book.CreatedAt, book.IsRead).Scan(&book.ID)
 			} else {
 				_, err = stmtUpdateBook.ExecContext(ctx,
-					book.URL, book.Title, book.Excerpt, book.Author, book.Public, book.ModifiedAt, hasContent, book.ID)
+					book.URL, book.Title, book.Excerpt, book.Author, book.Public, book.ModifiedAt, hasContent, book.IsRead, book.ID)
 			}
 			if err != nil {
 				return fmt.Errorf("failed to delete bookmark content: %w", err)
@@ -396,7 +397,8 @@ func (db *SQLiteDatabase) GetBookmarks(ctx context.Context, opts model.DBGetBook
 		b.public,
 		b.created_at,
 		b.modified_at,
-		b.has_content
+		b.has_content,
+		b.is_read
 		FROM bookmark b
 		WHERE 1`
 
@@ -473,6 +475,12 @@ func (db *SQLiteDatabase) GetBookmarks(ctx context.Context, opts model.DBGetBook
 			WHERE t.name IN(?))`
 
 		args = append(args, opts.ExcludedTags)
+	}
+
+	// Add where clause for read status
+	if opts.IsRead != nil {
+		query += ` AND b.is_read = ?`
+		args = append(args, *opts.IsRead)
 	}
 
 	// Add order clause
@@ -663,6 +671,12 @@ func (db *SQLiteDatabase) GetBookmarksCount(ctx context.Context, opts model.DBGe
 		args = append(args, opts.ExcludedTags)
 	}
 
+	// Add where clause for read status
+	if opts.IsRead != nil {
+		query += ` AND b.is_read = ?`
+		args = append(args, *opts.IsRead)
+	}
+
 	// Expand query, because some of the args might be an array
 	query, args, err := sqlx.In(query, args...)
 	if err != nil {
@@ -756,7 +770,7 @@ func (db *SQLiteDatabase) GetBookmark(ctx context.Context, id int, url string) (
 	sb := sqlbuilder.NewSelectBuilder()
 	sb.Select(
 		"b.id", "b.url", "b.title", "b.excerpt", "b.author", "b.public", "b.modified_at",
-		"bc.content", "bc.html", "b.has_content", "b.created_at")
+		"bc.content", "bc.html", "b.has_content", "b.created_at", "b.is_read")
 	sb.From("bookmark b")
 	sb.JoinWithOption(sqlbuilder.LeftJoin, "bookmark_content bc", "bc.docid = b.id")
 
@@ -1174,6 +1188,7 @@ func (db *SQLiteDatabase) SaveBookmark(ctx context.Context, bookmark model.Bookm
 		sb.Assign("public", bookmark.Public),
 		sb.Assign("modified_at", bookmark.ModifiedAt),
 		sb.Assign("has_content", bookmark.HasContent),
+		sb.Assign("is_read", bookmark.IsRead),
 	)
 	sb.Where(sb.Equal("id", bookmark.ID))
 
