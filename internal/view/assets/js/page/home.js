@@ -641,7 +641,7 @@ export default {
 				.then((json) => {
 					this.selection = [];
 					this.editMode = false;
-					json.forEach((book) => {
+					(json.bookmarks || json).forEach((book) => {
 						// download ebooks
 						const id = book.id;
 						if (book.hasEbook) {
@@ -739,7 +739,7 @@ export default {
 
 						let faildedUpdateArchives = [];
 						let faildedCreateEbook = [];
-						json.forEach((book) => {
+						(json.bookmarks || json).forEach((book) => {
 							var item = items.find((el) => el.id === book.id);
 							this.bookmarks.splice(item.index, 1, book);
 
@@ -838,7 +838,7 @@ export default {
 						this.dialog.loading = false;
 						this.dialog.visible = false;
 
-						json.forEach((book) => {
+						(json.bookmarks || json).forEach((book) => {
 							var item = items.find((el) => el.id === book.id);
 							this.bookmarks.splice(item.index, 1, book);
 						});

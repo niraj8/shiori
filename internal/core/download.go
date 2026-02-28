@@ -1,6 +1,7 @@
 package core
 
 import (
+	"fmt"
 	"io"
 	"net/http"
 	"time"
@@ -22,6 +23,12 @@ func DownloadBookmark(url string) (io.ReadCloser, string, error) {
 	resp, err := httpClient.Do(req)
 	if err != nil {
 		return nil, "", err
+	}
+
+	// Reject non-2xx responses and Cloudflare bot challenges (which may use HTTP 200)
+	if resp.StatusCode < 200 || resp.StatusCode > 299 || resp.Header.Get("cf-mitigated") == "challenge" {
+		resp.Body.Close()
+		return nil, "", fmt.Errorf("failed to download %s: HTTP %d", url, resp.StatusCode)
 	}
 
 	// Get content type

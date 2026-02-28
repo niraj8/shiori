@@ -159,7 +159,16 @@ func HandleUpdateCache(deps model.Dependencies, c model.WebContext) {
 	wg.Wait()
 	close(chDone)
 
-	response.SendJSON(c, http.StatusOK, bookmarks)
+	// Save bookmarks to database (failed ones retain original DB values, so saving is safe)
+	_, err = deps.Database().SaveBookmarks(c.Request().Context(), false, bookmarks...)
+	if err != nil {
+		deps.Logger().WithError(err).Error("error saving bookmarks")
+	}
+
+	response.SendJSON(c, http.StatusOK, map[string]any{
+		"bookmarks": bookmarks,
+		"failures":  idWithProblems,
+	})
 }
 
 type bulkUpdateBookmarkTagsPayload struct {

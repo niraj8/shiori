@@ -134,8 +134,12 @@ buildx:
 	$(info: Make: Buildx)
 	@bash scripts/buildx.sh
 
+## Build binary targeting linux for the current architecture (used by buildx-local)
+build-local-linux: clean
+	GOOS=linux GOARCH=$(shell go env GOARCH) GIN_MODE=$(GIN_MODE) goreleaser build --clean --snapshot --single-target
+
 ## Build docker image for local development
-buildx-local: build-local
+buildx-local: build-local-linux
 	$(info: Make: Build image locally)
 	CONTAINER_BUILDX_OPTIONS="-t shiori:localdev --output type=docker" BUILDX_PLATFORMS=$(LOCAL_BUILD_PLATFORM) scripts/buildx.sh
 
